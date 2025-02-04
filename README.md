@@ -1,112 +1,160 @@
+# Documentação do Script de Coleta de Dados da API da Marvel
 
-#### Objetivo
-Este código realiza integração com a API da Marvel para obter dados sobre personagens, quadrinhos e eventos. Ele segue as etapas de autenticação, requisição, transformação e armazenamento dos dados em um banco SQLite e arquivos CSV.
+## Descrição
+Este script tem como objetivo realizar requisições à API da Marvel para coletar dados sobre personagens, quadrinhos e eventos, armazenando as informações em arquivos CSV e em um banco de dados SQLite.
 
----
+## Requisitos
+Antes de executar o script, certifique-se de que todas as bibliotecas necessárias estão instaladas. Utilize o seguinte comando para instalar as dependências:
 
-### Importação de Bibliotecas
-- **requests**: Usada para realizar requisições HTTP.
-- **hashlib**: Utilizada para gerar o hash MD5 necessário na autenticação.
-- **pandas**: Para manipulação e transformação de dados.
-- **sqlite3**: Para conexão e manipulação do banco de dados SQLite.
-- **json**: Para manipulação de dados JSON.
-- **userdata**: Utilizada para obter credenciais do usuário no Google Colab.
+```bash
+pip install requests pandas sqlite3
+```
 
----
+O script também requer que as chaves de acesso da API da Marvel (publicKey e privateKey) estejam armazenadas no Google Colab através do `userdata`.
 
-### Funções
+## Estrutura do Script
+### 1. Importação de Bibliotecas
+O script inicia importando as bibliotecas necessárias:
+- `requests`: Para realizar requisições HTTP à API da Marvel.
+- `hashlib`: Para gerar um hash MD5 necessário para autenticação na API.
+- `pandas`: Para manipulação e estruturação dos dados coletados.
+- `sqlite3`: Para armazenar os dados em um banco de dados SQLite.
+- `json`: Para manipulação de dados no formato JSON.
+- `userdata` do Google Colab: Para armazenar e recuperar credenciais sensíveis.
 
-#### `hashToMD5(publicKey, privateKey)`
-- **Descrição**: Gera um hash MD5 para autenticação na API da Marvel.
-- **Parâmetros**:
-  - `publicKey`: Chave pública da API.
-  - `privateKey`: Chave privada da API.
-- **Retorno**: Objeto MD5 gerado.
-- **Observação**: Usa um timestamp fixo (1) conforme o exemplo da documentação da API.
+### 2. Função de Geração do Hash MD5
+A função `hashToMD5` gera um hash MD5 usando a chave privada, a chave pública e um timestamp, conforme exigido pela API da Marvel.
 
-#### `get(url, endpoint, headers, params)`
-- **Descrição**: Realiza requisições GET à API.
-- **Parâmetros**:
-  - `url`: URL base da API.
-  - `endpoint`: Endpoint específico da API.
-  - `headers`: Cabeçalhos HTTP.
-  - `params`: Parâmetros de consulta.
-- **Retorno**: Resposta JSON da requisição.
-- **Tratamento de Erros**: Exibe exceções em caso de falha na requisição.
+```python
+def hashToMD5(publicKey, privateKey):
+    return hashlib.md5(str.encode(str(1) + str(privateKey) + str(publicKey)))
+```
 
-#### `mapper(keys, values)`
-- **Descrição**: Mapeia dados JSON para um formato estruturado.
-- **Parâmetros**:
-  - `keys`: Lista de chaves desejadas nos dados JSON.
-  - `values`: Lista de objetos JSON a serem mapeados.
-- **Retorno**: Lista de dicionários com os dados mapeados.
-- **Observações**:
-  - Converte listas e dicionários para strings usando `json.dumps`.
-  - É um mapeador genérico com limitações em tipagem.
+### 3. Função de Requisição de Dados
+A função `get` é responsável por fazer requisições à API da Marvel e retornar os dados no formato JSON.
 
-#### `saveToCSV(obj, csvPath)`
-- **Descrição**: Salva dados em um arquivo CSV.
-- **Parâmetros**:
-  - `obj`: Lista ou DataFrame contendo os dados.
-  - `csvPath`: Caminho e nome do arquivo CSV.
-- **Retorno**: Nenhum.
+```python
+def get(url: str, endpoint: str, headers: dict, params: dict):
+    try:
+        response = req.get(url=url+endpoint, headers=headers, params=params)
+        return response.json()
+    except Exception as e:
+        print(e)
+```
 
-#### `saveToSqlite(obj, tableName, dbPath='bd.db', uniqueColumns=None)`
-- **Descrição**: Salva dados em um banco SQLite.
-- **Parâmetros**:
-  - `obj`: Dados a serem inseridos (lista ou DataFrame).
-  - `tableName`: Nome da tabela no banco.
-  - `dbPath`: Caminho do arquivo SQLite.
-  - `uniqueColumns`: Colunas para garantir unicidade (evitar duplicatas).
-- **Retorno**: Nenhum.
-- **Observação**: Usa SQL para eliminar registros duplicados com base nas colunas de unicidade.
-- **Tratamento de Erros**: Exibe mensagens de erro em caso de falha.
+### 4. Funções de Armazenamento de Dados
+#### Salvamento em CSV
+A função `saveToCSV` salva os dados em arquivos CSV.
 
----
+```python
+def saveToCSV(obj, csvPath):
+    df = pd.DataFrame(obj)
+    df.to_csv(csvPath + '.csv', encoding='utf-8', index=False, header=True)
+```
 
-### Variáveis Globais
-- **`url`**: URL base da API da Marvel.
-- **`publicKey` e `privateKey`**: Credenciais do usuário obtidas via `userdata`.
-- **`securityHash`**: Hash MD5 gerado pela função `hashToMD5`.
-- **`dbPath`**: Caminho para o arquivo SQLite.
-- **`headers`**: Cabeçalhos HTTP padrão.
-- **`params`**: Parâmetros padrão para as requisições à API.
+#### Salvamento em SQLite
+A função `saveToSqlite` salva os dados em um banco SQLite e remove duplicatas baseando-se em colunas únicas.
 
----
+```python
+def saveToSqlite(obj, tableName, dbPath='bd.db', uniqueColumns=None):
+    try:
+        df = pd.DataFrame(obj) if not isinstance(obj, pd.DataFrame) else obj
+        with sqlite3.connect(dbPath) as con:
+            df.to_sql(tableName, con, if_exists='append', index=False)
+            if uniqueColumns:
+                uniqueClause = ", ".join(uniqueColumns)
+                query = f"""
+                    DELETE FROM {tableName}
+                    WHERE rowid NOT IN (
+                        SELECT MIN(rowid)
+                        FROM {tableName}
+                        GROUP BY {uniqueClause}
+                    );
+                """
+                con.execute(query)
+    except Exception as e:
+        print(f"Erro: {e}")
+```
 
-### Fluxo de Execução
-1. **Requisição de Personagens**:
-   - Endpoint: `characters`.
-   - Chaves mapeadas: `id`, `name`.
-   - Salva os dados em `characters.csv` e na tabela `characters` no SQLite.
+### 5. Configuração de Variáveis
+As credenciais e a URL base da API da Marvel são recuperadas a partir do `userdata`.
 
-2. **Requisição de Quadrinhos**:
-   - Endpoint: `comics`.
-   - Chaves mapeadas: `id`, `digitalId`, `title`, `issueNumber`, `dates`, `prices`, `resourceURI`.
-   - Salva os dados em `comics.csv` e na tabela `comics` no SQLite.
+```python
+url = 'http://gateway.marvel.com/v1/public/'
+publicKey = userdata.get('publicKey')
+privateKey = userdata.get('privateKey')
+securityHash = hashToMD5(publicKey, privateKey).hexdigest()
+dbPath = userdata.get('dbPath')
+```
 
-3. **Requisição de Eventos**:
-   - Endpoint: `events`.
-   - Chaves mapeadas: `id`, `title`, `description`, `resourceURI`, `start`, `end`.
-   - Salva os dados em `events.csv` e na tabela `events` no SQLite.
+Headers e parâmetros padrões são definidos:
 
----
+```python
+headers = {'Accept': "*/*"}
+params = {
+    "ts": 1,
+    "apikey": publicKey,
+    "hash": securityHash,
+    "limit": 100
+}
+```
 
-### Observações Importantes
-- **Autenticação**:
-  - A API exige timestamp, chave pública e hash MD5.
-  - O timestamp fixo usado no exemplo (1) pode ser modificado para valores dinâmicos.
+### 6. Coleta de Dados e Armazenamento
+O script coleta dados de três endpoints da API da Marvel: `characters`, `comics` e `events`.
 
-- **Limitações do Mapper**:
-  - Gera apenas strings para tipos complexos (listas e dicionários).
-  - Pode ser substituído por uma implementação mais robusta.
+#### Coleta de Personagens
 
-- **Melhorias Possíveis**:
-  - Implementar classes para representar os dados de forma mais estruturada.
-  - Tornar o timestamp dinâmico.
-  - Adicionar logs mais detalhados para monitoramento de erros e execução.
+```python
+endpoint = 'characters'
+result = get(url, endpoint, headers, params)['data']['results']
+characters = [{
+    "id": x['id'],
+    "name": x["name"],
+    "description": x["description"],
+    "comics": ''.join([y["name"] for y in x["comics"]["items"]]),
+    "events": ''.join([y["name"] for y in x["events"]["items"]])
+} for x in result]
+saveToCSV(csvPath=endpoint, obj=characters)
+saveToSqlite(characters, endpoint, dbPath, ['id'])
+```
 
----
+#### Coleta de Quadrinhos
 
-### Referências
-- Documentação oficial da [API Marvel](https://developer.marvel.com/).
+```python
+endpoint = 'comics'
+result = get(url, endpoint, headers, params)['data']['results']
+comics = [{
+    "id": x["id"],
+    "digitalId": x["digitalId"],
+    "title": x["title"],
+    "pageCount": x["pageCount"],
+    "issueNumber": x["issueNumber"],
+    "dateType": ''.join([y["type"] for y in x["dates"]]),
+    "dates": ''.join([y["date"] for y in x["dates"]]),
+    "priceType": ''.join([y["type"] for y in x["prices"]]),
+    "prices": ''.join([str(y["price"]) for y in x["prices"]]),
+    "events": ''.join([y["name"] for y in x["events"]["items"]]),
+    "creators": ''.join(x["creators"])
+} for x in result]
+saveToCSV(csvPath=endpoint, obj=comics)
+saveToSqlite(comics, endpoint, dbPath, ["id"])
+```
+
+#### Coleta de Eventos
+
+```python
+endpoint = "events"
+result = get(url, endpoint, headers, params)["data"]["results"]
+events = [{
+    "id": x["id"],
+    "title": x["title"],
+    "description": x["description"],
+    "start": x["start"],
+    "end": x["end"],
+    "comics": ''.join([y["name"] for y in x["comics"]["items"]]),
+    "characters": ''.join([y["name"] for y in x["characters"]["items"]])
+} for x in result]
+saveToCSV(csvPath=endpoint, obj=events)
+saveToSqlite(events, endpoint, dbPath, ["id"])
+```
+
