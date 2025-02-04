@@ -1,4 +1,4 @@
-# Documentação do Script de Coleta de Dados da API da Marvel
+# Coleta de Dados da API da Marvel
 
 ## Descrição
 Este script tem como objetivo realizar requisições à API da Marvel para coletar dados sobre personagens, quadrinhos e eventos, armazenando as informações em arquivos CSV e em um banco de dados SQLite.
@@ -10,7 +10,8 @@ Antes de executar o script, certifique-se de que todas as bibliotecas necessári
 pip install requests pandas sqlite3
 ```
 
-O script também requer que as chaves de acesso da API da Marvel (publicKey e privateKey) estejam armazenadas no Google Colab através do `userdata`.
+O script também requer que as chaves de acesso da API da Marvel (publicKey e privateKey) estejam armazenadas no Google Colab através do `userdata`.  
+As chaves podem ser acessadas ao realizar login ao Marvel Developer Portal com as credenciais de acesso `https://developer.marvel.com/`.
 
 ## Estrutura do Script
 ### 1. Importação de Bibliotecas
@@ -23,7 +24,8 @@ O script inicia importando as bibliotecas necessárias:
 - `userdata` do Google Colab: Para armazenar e recuperar credenciais sensíveis.
 
 ### 2. Função de Geração do Hash MD5
-A função `hashToMD5` gera um hash MD5 usando a chave privada, a chave pública e um timestamp, conforme exigido pela API da Marvel.
+A função `hashToMD5` gera um hash MD5 usando a chave privada, a chave pública e um timestamp, conforme exigido pela API da Marvel.  
+O timestamp está setado manualmente como um str(1), mas pode ser modificado para algo dinâmico.
 
 ```python
 def hashToMD5(publicKey, privateKey):
@@ -42,8 +44,8 @@ def get(url: str, endpoint: str, headers: dict, params: dict):
         print(e)
 ```
 
-### 4. Funções de Armazenamento de Dados
-#### Salvamento em CSV
+### 4. Armazenamento de Dados
+#### Salvar em CSV
 A função `saveToCSV` salva os dados em arquivos CSV.
 
 ```python
@@ -52,9 +54,9 @@ def saveToCSV(obj, csvPath):
     df.to_csv(csvPath + '.csv', encoding='utf-8', index=False, header=True)
 ```
 
-#### Salvamento em SQLite
-A função `saveToSqlite` salva os dados em um banco SQLite e remove duplicatas baseando-se em colunas únicas.
-
+#### Salvar em SQLite
+A função `saveToSqlite` salva os dados em um banco SQLite e remove duplicatas baseando-se em colunas únicas.  
+O trabalho de verificação de duplicados está a cargo do banco. Pode gerar ganho de performance em grandes volumes de dados.
 ```python
 def saveToSqlite(obj, tableName, dbPath='bd.db', uniqueColumns=None):
     try:
@@ -87,7 +89,7 @@ securityHash = hashToMD5(publicKey, privateKey).hexdigest()
 dbPath = userdata.get('dbPath')
 ```
 
-Headers e parâmetros padrões são definidos:
+Headers e parâmetros padrões:
 
 ```python
 headers = {'Accept': "*/*"}
