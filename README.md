@@ -167,6 +167,21 @@ saveToSqlite(events, endpoint, dbPath, ["id"])
 ```
 
 ### 7. Insights Para Análises de Dados  
+
 Os dados coletados por meio deste script python, fornece insights úteis para tópicos de análises de dados, considerando informações disponíveis no retorno dos endpoints analisados.   
 
+
+#### Análise de dados em Events  
+
+Com base nos dados coletados em Events, é possível extrair elementos para diversas análises, como a quantidade de Comics publicados em cada evento, chegando ao evento mais populoso em quantidade de publicações, número de vendas por evento, total faturado no evento, faturamento médio por personagem, faturamento médio por evento, quantidade total de páginas por evento, média de páginas publicadas em cada evento, dentre outras possibilidades.   
+
+
+#### Análise de dados em Comics  
+
+Com base nos dados analisados em Comics, é possível calcular métricas como a quantidade de vendas de um determinado quadrinho, qual o quadrinho que teve o maior número de edições, preço médio de quadrinhos, faturamento total de determinada edição de quadrinho, número total de páginas publicadas, quantidade média de páginas por quadrinhos, sendo possível analisar se o público tem preferência a determinada quantidade de páginas, podendo determinar o modelo de publicações de novos quadrinhos no futuro, dentre outras análises possíveis com base nos dados de vendas, preço e quantidade de páginas por quadrinho.  
+
+
+#### Análise de dados em Characters  
+
+Dentre as possibilidades disponíveis de análises de dados em personagens, pode-se realizar verificações de participações de personagens em quadrinhos, chegando ao personagem que mais tem partiicpações, maior faturamento, e maior quantidade de páginas publicadas, sendo possível validar métricas de faturamento médio por personagem, maior faturamento de personagem, dentre outras possibilidades.
 
