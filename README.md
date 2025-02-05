@@ -11,16 +11,18 @@ pip install requests pandas sqlite3
 ```
 
 O script também requer que as chaves de acesso da API da Marvel (publicKey e privateKey) estejam armazenadas no Google Colab através do `userdata`.  
-As chaves podem ser acessadas ao realizar login ao Marvel Developer Portal com as credenciais de acesso `https://developer.marvel.com/`.
+As chaves podem ser acessadas ao realizar login ao Marvel Developer Portal com as credenciais de acesso `https://developer.marvel.com/`.  
+![image](https://github.com/user-attachments/assets/121892ff-e3ae-48c4-b807-04182272c75e)
 
-## Estrutura do Script
-### 1. Importação de Bibliotecas
-O script inicia importando as bibliotecas necessárias:
-- `requests`: Para realizar requisições HTTP à API da Marvel.
-- `hashlib`: Para gerar um hash MD5 necessário para autenticação na API.
-- `pandas`: Para manipulação e estruturação dos dados coletados.
+
+## Estrutura do Código
+### 1. Importação de Bibliotecas que serão utilizadas
+O script inicia importando as bibliotecas:
+- `requests`: Para realizar requisições HTTP do tipo GET à API da Marvel.
+- `hashlib`: Para gerar um hash MD5 necessário para autenticação na API conforme documentação Marvel.
+- `pandas`: Para manipulação e estruturação dos dados coletados em um data frame, exportando em .CSV e armazenamento no banco.
 - `sqlite3`: Para armazenar os dados em um banco de dados SQLite.
-- `json`: Para manipulação de dados no formato JSON.
+- `json`: Para manipulação de dados no formato JSON que retornam da requisição à API Marvel.
 - `userdata` do Google Colab: Para armazenar e recuperar credenciais sensíveis.
 
 ### 2. Função de Geração do Hash MD5
@@ -33,7 +35,7 @@ def hashToMD5(publicKey, privateKey):
 ```
 
 ### 3. Função de Requisição de Dados
-A função `get` é responsável por fazer requisições à API da Marvel e retornar os dados no formato JSON.
+A função `get` é responsável por fazer requisições à API da Marvel e retornar os dados no formato JSON que será manipulado posteriormente.
 
 ```python
 def get(url: str, endpoint: str, headers: dict, params: dict):
@@ -46,7 +48,7 @@ def get(url: str, endpoint: str, headers: dict, params: dict):
 
 ### 4. Armazenamento de Dados
 #### Salvar em CSV
-A função `saveToCSV` salva os dados em arquivos CSV.
+A função `saveToCSV` salva os dados do data frame em arquivos CSV utilizando `.to_csv` passando como parâmetro o nome e estrutura do arquivo.
 
 ```python
 def saveToCSV(obj, csvPath):
@@ -89,7 +91,8 @@ securityHash = hashToMD5(publicKey, privateKey).hexdigest()
 dbPath = userdata.get('dbPath')
 ```
 
-Headers e parâmetros padrões:
+Headers e parâmetros padrões:  
+O `limit` padrão da requisição caso não seja informado é 20, e o limite máximo definido é 100.
 
 ```python
 headers = {'Accept': "*/*"}
@@ -102,9 +105,10 @@ params = {
 ```
 
 ### 6. Coleta de Dados e Armazenamento
-O script coleta dados de três endpoints da API da Marvel: `characters`, `comics` e `events`.
+O script coleta dados de três endpoints da API da Marvel: `characters`, `comics` e `events`, podendo ser acrescentados endpoints conforme necessidade de análises.
 
-#### Coleta de Personagens
+#### Coleta de Personagens:  
+Para o retorno de Comics e Events, está sendo manipulado o objeto de retorno para armazenamento em uma lista, utilizando `','.join` passando como separador uma vírula, em conjunto com um loop `for`. 
 
 ```python
 endpoint = 'characters'
@@ -113,14 +117,15 @@ characters = [{
     "id": x['id'],
     "name": x["name"],
     "description": x["description"],
-    "comics": ''.join([y["name"] for y in x["comics"]["items"]]),
-    "events": ''.join([y["name"] for y in x["events"]["items"]])
+    "comics": ','.join([y["name"] for y in x["comics"]["items"]]),
+    "events": ','.join([y["name"] for y in x["events"]["items"]])
 } for x in result]
 saveToCSV(csvPath=endpoint, obj=characters)
 saveToSqlite(characters, endpoint, dbPath, ['id'])
 ```
 
-#### Coleta de Quadrinhos
+#### Coleta de Quadrinhos  
+O objeto de retorno manipulado na coleta de quadrinhos é `dataType`, `dates`, `pricetype`, `prices`, `events` e `creators`
 
 ```python
 endpoint = 'comics'
@@ -131,18 +136,19 @@ comics = [{
     "title": x["title"],
     "pageCount": x["pageCount"],
     "issueNumber": x["issueNumber"],
-    "dateType": ''.join([y["type"] for y in x["dates"]]),
-    "dates": ''.join([y["date"] for y in x["dates"]]),
-    "priceType": ''.join([y["type"] for y in x["prices"]]),
-    "prices": ''.join([str(y["price"]) for y in x["prices"]]),
-    "events": ''.join([y["name"] for y in x["events"]["items"]]),
-    "creators": ''.join(x["creators"])
+    "dateType": ','.join([y["type"] for y in x["dates"]]),
+    "dates": ','.join([y["date"] for y in x["dates"]]),
+    "priceType": ','.join([y["type"] for y in x["prices"]]),
+    "prices": ','.join([str(y["price"]) for y in x["prices"]]),
+    "events": ','.join([y["name"] for y in x["events"]["items"]]),
+    "creators": ','.join(x["creators"])
 } for x in result]
 saveToCSV(csvPath=endpoint, obj=comics)
 saveToSqlite(comics, endpoint, dbPath, ["id"])
 ```
 
-#### Coleta de Eventos
+#### Coleta de Eventos  
+O objeto de reotno manipulado na coleta de eventos é `comics` e `characters`.
 
 ```python
 endpoint = "events"
@@ -153,10 +159,14 @@ events = [{
     "description": x["description"],
     "start": x["start"],
     "end": x["end"],
-    "comics": ''.join([y["name"] for y in x["comics"]["items"]]),
-    "characters": ''.join([y["name"] for y in x["characters"]["items"]])
+    "comics": ','.join([y["name"] for y in x["comics"]["items"]]),
+    "characters": ','.join([y["name"] for y in x["characters"]["items"]])
 } for x in result]
 saveToCSV(csvPath=endpoint, obj=events)
 saveToSqlite(events, endpoint, dbPath, ["id"])
 ```
+
+### 7. Insights Para Análises de Dados  
+Os dados coletados por meio deste script python, fornece insights úteis para tópicos de análises de dados, considerando informações disponíveis no retorno dos endpoints analisados.   
+
 
